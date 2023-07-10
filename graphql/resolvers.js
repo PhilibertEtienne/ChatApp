@@ -1,3 +1,6 @@
+const bcrypt = require('bcrypt')
+const { UserInputError } = require('apollo-server')
+
 const { User } = require('../models')
 
 module.exports = {
@@ -13,22 +16,57 @@ module.exports = {
     },
   },
   Mutation: {
-    register:async (_,args,context,info ) => {
-      const {username,email,password,confirmPassword} = args
-      try  {
-        //TODO: validate input data
+    register: async (_, args) => {
+      let { username, email, password, confirmPassword } = args
+      let errors = {}
 
-        //TODO: check if username already exists
+      try {
+        // Validate input data
+        if (email.trim() === '') errors.email = 'email must not be empty'
+        if (username.trim() === '')
+          errors.username = 'username must not be empty'
+        if (password.trim() === '')
+          errors.password = 'password must not be empty'
+        if (confirmPassword.trim() === '')
+          errors.confirmPassword = 'repeat password must not be empty'
 
-        //TODO: create user 
+        if (password !== confirmPassword)
+          errors.confirmPassword = 'passwords must match'
+
+        // // Check if username / email exists
+        // const userByUsername = await User.findOne({ where: { username } })
+        // const userByEmail = await User.findOne({ where: { email } })
+
+        // if (userByUsername) errors.username = 'Username is taken'
+        // if (userByEmail) errors.email = 'Email is taken'
+
+        if (Object.keys(errors).length > 0) {
+          throw errors
+        }
+
+        // Hash password
+        password = await bcrypt.hash(password, 6)
+
+        // Create user
         const user = await User.create({
-          username, email, password
+          username,
+          email,
+          password,
         })
-        //TODO: return created user
+
+        // Return user
+        return user
       } catch (err) {
         console.log(err)
-        throw err
+        if (err.name === 'SequelizeUniqueConstraintError') {
+          err.errors.forEach(
+            (e) => (errors[e.path] = `${e.path} is already taken`)
+          )
+        } else if (err.name === 'SequelizeValidationError') {
+          err.errors.forEach((e) => (errors[e.path] = e.message))
+        }
+        throw new UserInputError('Bad input', { errors })
       }
-  }
-}
+    },
+  },
 }
