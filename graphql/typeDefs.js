@@ -5,7 +5,7 @@
  `#graphql
   type User {
     username: String!
-    email : String!
+    email: String!
     createdAt: String
     token: String
   }
